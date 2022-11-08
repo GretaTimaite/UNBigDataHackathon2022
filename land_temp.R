@@ -32,3 +32,11 @@ world_land |> dplyr::select("X2017") |> plot()
 
 # plot CO2 emissions in 2021
 world_land |> dplyr::select("X2010") |> plot()
+
+# EDA
+library(tidyverse)
+world %>% arrange(name_long) 
+landtemp
+library(tmap)
+world_land %>% tm_shape() + tm_polygons(col="X2017",style="quantile")
+world_land %>% tm_shape() + tm_polygons(col="X2010",breaks=c(0,170,4270,9932,33050,128706,10096010))

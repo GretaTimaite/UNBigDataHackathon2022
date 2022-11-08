@@ -1,4 +1,4 @@
-# AIM: visualise land temp
+# AIM: visualise CO2 emissions
 
 # read excel file
 landtemp = readxl::read_excel("data/CO2emissionsbycountry.xlsx",
@@ -30,5 +30,5 @@ world_land = cbind(world_sub, landtemp_sub,
                    sf_column_name = "geom")
 world_land |> dplyr::select("X2017") |> plot()
 
-# plot land temp in 2021
+# plot CO2 emissions in 2021
 world_land |> dplyr::select("X2010") |> plot()

@@ -1,6 +1,10 @@
 # The aim of this script is to prepare data for further analysis
 # Tasks: clean, subset, join
 
+# FINAL data is here: https://github.com/GretaTimaite/UNBigDataHackathon2022/releases/tag/v0.1
+# this excludes World Values Survey as redistribution is not allowed 
+# please go to their website to download required data. I recommend getting .sav (SPSS) extension
+
 
 # ======== get data ========
 # CO2 emissions data
@@ -8,19 +12,19 @@ co2emissions = readxl::read_excel("data/CO2emissionsbycountry.xlsx",
                                   skip = 2)
 
 # GDP per capita data
-gdp <- readxl::read_excel("data/gdp/gdp.xls", skip = 2)
+gdp = readxl::read_excel("data/gdp/gdp.xls", skip = 2)
 
 # our world :)
 world = spData::world
 
 # Renewable energy consumption (% of total final energy consumption)
-renewable_ec <- readxl::read_excel("data/Renewable energy consumption (% of total final energy consumption).xlsx", skip = 2)
+renewable_ec = readxl::read_excel("data/Renewable energy consumption (% of total final energy consumption).xlsx", skip = 2)
 
 # Frequencies of climate-related natural disasters
-climate_disasters <- readxl::read_excel("data/Climate-related_Disasters_Frequency.xlsx")
+climate_disasters = readxl::read_excel("data/Climate-related_Disasters_Frequency.xlsx")
 
 # Land temperatures
-land_temp <- readr::read_csv("data/GlobalLandTemperaturesByCountry.csv")
+land_temp = readr::read_csv("data/GlobalLandTemperaturesByCountry.csv")
 
 # ====== subset data =====
 # first let's subset all datasets, so the period is from 2000 to 2019 as a great number of countries have data only from 1990 and/or lack 2020 onwards
@@ -89,6 +93,33 @@ tmap::tm_shape(climate_action_data) +
 # sf::st_write(climate_action_data,
 # "climate_action_data.geojson")
 
+# ====== World Values Survey =====
+# NOTE world values survey 
 
+# read waves 4-7
+wvs4 = foreign::read.spss("data/WV4_Data_spss_v20201117.sav", to.data.frame = TRUE)
+wvs5 = foreign::read.spss("data/WV5_Data_Spss_v20180912.sav", to.data.frame = TRUE)
+wvs6 = foreign::read.spss("data/WV6_Data_sav_v20201117.sav", to.data.frame = TRUE)
+wvs7 = foreign::read.spss("data/WVS_Cross-National_Wave_7_spss_v4_0.sav", to.data.frame = TRUE)
 
+# let's extract data from each wave:
+# country
+# Protecting environment vs. Economic growth
+# sex
+# age
+# education
+# social class
+# income level
+
+wvs7_sub = wvs7 |> dplyr::select(B_COUNTRY_ALPHA, Q111, Q260, X003R2, Q275R, Q287, Q288R)
+colnames(wvs7_sub) = c("country", "env", "sex", "age", "education", "class", "income")
+
+wvs6_sub = wvs6 |> dplyr::select(B_COUNTRY_ALPHA, V81, V240, V242, V248, V238, V239)
+colnames(wvs6_sub) = c("country", "env", "sex", "age", "education", "class", "income")
+
+wvs5_sub = wvs5 |> dplyr::select(B_COUNTRY_ALPHA, V104, V235, V238, V252, V253)
+colnames(wvs5_sub) = c("country", "env", "sex", "age", "education", "class", "income")
+
+wvs4_sub = wvs4 |> dplyr::select(B_COUNTRY_ALPHA, V36, V223, V225, V226, V235, V236)
+colnames(wvs4_sub) = c("country", "env", "sex", "age", "education", "class", "income")
 

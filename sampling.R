@@ -1,23 +1,27 @@
 # AIM: sampling using kmeans
 
+# CO2 emissions data
 co2emissions = readxl::read_excel("data/CO2emissionsbycountry.xlsx",
                               skip = 2)
 
+# GDP per capita data
 gdp <- readxl::read_excel("data/gdp/gdp.xls", skip = 2)
 
+# our world :)
 world = spData::world
 
-gdp_2019 = gdp |> dplyr::select(`Country Name`, `2019`)
-colnames(gdp_2019) = c("gdp_country_name", "gdp_2019")
+# Select columns that will be used for kmeans clustering
+gdp_2019 = gdp |> dplyr::select(`Country Code`, `2019`)
+colnames(gdp_2019) = c("gdp_country_name", "gdp_2019") # rename to avoid duplication of column names
 
-co2emissions2019 = co2emissions |> dplyr::select(`Country Name`, `2019`)
+co2emissions2019 = co2emissions |> dplyr::select(`Country Code`, `2019`)
 
 # join both subsetted datasets
 gdp_co2 = cbind(gdp_2019, co2emissions2019) |> tidyr::drop_na()
 
 
 # let's find out which countries in world are also in gdp_land
-gdp_co2_logical = gdp_co2$`Country Name` %in% world$name_long
+gdp_co2_logical = gdp_co2$`Country Code` %in% world$is
 gdp_co2_logical |> table()
 gdp_co2_sub = gdp_co2[gdp_co2_logical,] |> tidyr::drop_na()
 

@@ -112,14 +112,106 @@ wvs7 = foreign::read.spss("data/WVS_Cross-National_Wave_7_spss_v4_0.sav", to.dat
 # income level
 
 wvs7_sub = wvs7 |> dplyr::select(B_COUNTRY_ALPHA, Q111, Q260, X003R2, Q275R, Q287, Q288R)
-colnames(wvs7_sub) = c("country", "env", "sex", "age", "education", "class", "income")
+colnames(wvs7_sub) = c("country_7", "env_7", "sex_7", "age_7", "education_7", "class_7", "income_7")
 
-wvs6_sub = wvs6 |> dplyr::select(B_COUNTRY_ALPHA, V81, V240, V242, V248, V238, V239)
-colnames(wvs6_sub) = c("country", "env", "sex", "age", "education", "class", "income")
+wvs6_sub = wvs6 |> dplyr::select(B_COUNTRY_ALPHA, V81, V240, X003R2, V248, V238, V239)
+colnames(wvs6_sub) = c("country_6", "env_6", "sex_6", "age_6", "education_6", "class_6", "income_6")
 
-wvs5_sub = wvs5 |> dplyr::select(B_COUNTRY_ALPHA, V104, V235, V238, V252, V253)
-colnames(wvs5_sub) = c("country", "env", "sex", "age", "education", "class", "income")
+wvs5_sub = wvs5 |> dplyr::select(V2, V104, V235, V237, V238, V252, V253) # I cannot believe this dataset doesn't have ISO code...
+colnames(wvs5_sub) = c("country_5", "env_5", "sex_5", "age_5", "education_5", "class_5", "income_5")
 
-wvs4_sub = wvs4 |> dplyr::select(B_COUNTRY_ALPHA, V36, V223, V225, V226, V235, V236)
-colnames(wvs4_sub) = c("country", "env", "sex", "age", "education", "class", "income")
+wvs4_sub = wvs4 |> dplyr::select(B_COUNTRY_ALPHA, V36, V223, V225R2, V226, V235, V236)
+colnames(wvs4_sub) = c("country_4", "env_4", "sex_4", "age_4", "education_4", "class_4", "income_4")
+
+# let's recode variables...
+# also
+# find out max length of each, we'll use this information to create NA cells, so length of all datasets is the same
+# then we'll be able to join them easily
+
+max_length = max(c(nrow(wvs4_sub), nrow(wvs5_sub), nrow(wvs6_sub), nrow(wvs7_sub)))
+max_length # wave 6 has most obervations
+
+wvs7_sub = wvs7_sub |> 
+  dplyr::mutate (env_7_num = env_7 |> as.numeric(),
+                # env_7_num = c(wvs7_sub$env_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                sex_7_num = sex_7 |> as.numeric(),
+                # sex_7_num = c(wvs7_sub$sex_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                age_7_num = age_7 |> as.numeric(),
+                # age_7_num = c(wvs7_sub$age_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                education_7_num = education_7 |> as.numeric(),
+                # education_7_num = c(wvs7_sub$education_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                income_7_num = income_7 |> as.numeric(),
+                # income_7_num = c(wvs7_sub$income_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                )
+
+wvs7_new = data.frame(env_7_num = c(wvs7_sub$env_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                      sex_7_num = c(wvs7_sub$sex_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                      age_7_num = c(wvs7_sub$age_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                      education_7_num = c(wvs7_sub$education_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                      income_7_num = c(wvs7_sub$income_7_num, rep(NA, max_length - nrow(wvs7_sub))),
+                      country_7 = c(wvs7_sub$country_7, rep(NA, max_length - nrow(wvs7_sub)))
+                      )
+
+wvs6_sub = wvs6_sub |> 
+  dplyr::mutate(env_6_num = env_6 |> as.numeric() |> as.factor(),
+                sex_6_num = sex_6 |> as.numeric(),
+                age_6_num = age_6 |> as.numeric(),
+                education_6_num = education_6 |> as.numeric(),
+                income_6_num = income_6 |> as.numeric())
+
+wvs6_new = data.frame(env_6_num = c(wvs6_sub$env_6_num, rep(NA, max_length - nrow(wvs6_sub))),
+                      sex_6_num = c(wvs6_sub$sex_6_num, rep(NA, max_length - nrow(wvs6_sub))),
+                      age_6_num = c(wvs6_sub$age_6_num, rep(NA, max_length - nrow(wvs6_sub))),
+                      education_6_num = c(wvs6_sub$education_6_num, rep(NA, max_length - nrow(wvs6_sub))),
+                      income_6_num = c(wvs6_sub$income_6_num, rep(NA, max_length - nrow(wvs6_sub))),
+                      country_6 = c(wvs6_sub$country_6, rep(NA, max_length - nrow(wvs6_sub)))
+)
+
+wvs5_sub = wvs5_sub |> 
+  dplyr::mutate(env_5_num = env_5 |> as.numeric() |> as.factor(),
+                sex_5_num = sex_5 |> as.numeric(),
+                age_5_num = age_5 |> as.numeric() |> cut(breaks = c(0, 29, 49, 120), labels = c(1,2,3)),
+                education_5_num = education_5 |> as.numeric(),
+                income_5_num = income_5 |> as.numeric())
+
+wvs5_new = data.frame(env_5_num = c(wvs5_sub$env_5_num, rep(NA, max_length - nrow(wvs5_sub))),
+                      sex_5_num = c(wvs5_sub$sex_5_num, rep(NA, max_length - nrow(wvs5_sub))),
+                      age_5_num = c(wvs5_sub$age_5_num, rep(NA, max_length - nrow(wvs5_sub))),
+                      education_5_num = c(wvs5_sub$education_5_num, rep(NA, max_length - nrow(wvs5_sub))),
+                      income_5_num = c(wvs5_sub$income_5_num, rep(NA, max_length - nrow(wvs5_sub))),
+                      country_5 = c(wvs5_sub$country_5, rep(NA, max_length - nrow(wvs5_sub)))
+)
+
+wvs4_sub = wvs4_sub |> 
+  dplyr::mutate(env_4_num = env_4 |> as.numeric() |> as.factor(),
+                sex_4_num = sex_4 |> as.numeric(),
+                age_4_num = age_4 |> as.numeric(),
+                education_4_num = education_4 |> as.numeric(),
+                income_4_num = income_4 |> as.numeric())
+
+wvs4_new = data.frame(env_4_num = c(wvs4_sub$env_4_num, rep(NA, max_length - nrow(wvs4_sub))),
+                      sex_4_num = c(wvs4_sub$sex_4_num, rep(NA, max_length - nrow(wvs4_sub))),
+                      age_4_num = c(wvs4_sub$age_4_num, rep(NA, max_length - nrow(wvs4_sub))),
+                      education_4_num = c(wvs4_sub$education_4_num, rep(NA, max_length - nrow(wvs4_sub))),
+                      income_4_num = c(wvs4_sub$income_4_num, rep(NA, max_length - nrow(wvs4_sub))),
+                      country_4 = c(wvs4_sub$country_4, rep(NA, max_length - nrow(wvs4_sub)))
+)
+
+
+# sanity check that levels match numeric values
+wvs7_sub$age_7 |> unique()
+wvs7_sub$age_7_num |> unique()
+wvs6_sub$age_6 |> unique()
+wvs6_sub$age_6_num |> unique()
+wvs5_sub$age_5 |> unique()
+wvs5_sub$age_5_num |> unique()
+wvs4_sub$age_4 |> unique()
+wvs4_sub$age_4_num |> unique()
+
+# let's join all wvs waves into one
+
+wvs = cbind(wvs4_new, wvs5_new, wvs6_new, wvs7_new)
+# let's save data
+# write.csv(wvs,
+#           "wvs.csv")
 

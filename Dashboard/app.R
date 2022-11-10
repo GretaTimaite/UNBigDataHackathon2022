@@ -15,9 +15,17 @@ library(ggplot2)
 library(shiny)
 library(tidyverse)
 library(shinythemes)
+<<<<<<< HEAD
 #library(RColorBrewer)
 #library(fields)
 #library(ggsci)
+=======
+library(RColorBrewer)
+library(fields)
+library(ggsci)
+library(sf)
+library(geojsonio)
+>>>>>>> b5cb4708e260d1b8482a9818dbc9d509fe912985
 library(tmap)
 # load data
 sfdf <- geojson_read("climate_action_data.geojson",what="sp") %>% st_as_sf()

@@ -1,0 +1,263 @@
+---
+title: "UN_Hackathon"
+format: html
+editor: visual
+---
+
+## 
+
+## Exploratory data analysis
+
+```{r}
+# Load awesomeness
+library(tidyverse)
+library(sf)
+library(here)
+library(paletteer)
+
+# Load data
+wvs <- read_csv("wvs.csv")
+ca_df <- st_read("climate_action_data.geojson")
+osm <- read_csv("result.csv")
+```
+
+## What factors could influence the question: Protecting environment vs. Economic growth
+
+-   1-Protecting the environment should be given priority, even if it causes slower economic growth and some loss of jobs.
+
+-   2-Economic growth and creating jobs should be the top priority, even if the environment suffers to some extent
+
+-   3-Other
+
+### How has this response changed over time?
+
+-   wvs4(1999 - 2004)
+
+-   wvs5(2005-2008)
+
+-   wvs6 (2010 - 2014)
+
+-   wvs7(2017-2022)
+
+```{r}
+theme_set(theme_light())
+# Explore how responses have changed over time
+env_count <- wvs %>% 
+  # Select evn columns
+  select(contains("env")) %>% 
+  #filter(if_any(everything(), is.na)) %>% 
+  # Reshape data for easy analysis
+  pivot_longer(everything(), names_to = "env", values_to = "opinion") %>% 
+#mutate(across(everything()))
+  # Drop missing values
+  drop_na() %>% 
+  mutate(opinion = factor(opinion)) %>% 
+  # Count number of respondents in each category
+  count(env, opinion) %>% 
+  group_by(env) %>% 
+  mutate(total = sum(n)) %>% 
+  ungroup() %>% 
+  mutate(pct = n/total) %>% 
+  # Rename rows
+  mutate(env = case_when(
+    env == "env_4_num" ~ "wave_4",
+    env == "env_5_num" ~ "wave_5",
+    env == "env_6_num" ~ "wave_6",
+    env == "env_7_num" ~ "wave_7"
+  ))
+
+# Visualize this
+env_count %>% 
+  ggplot(mapping = aes(x = env, y = pct*100)) +
+  geom_col(aes(fill = opinion), position = "dodge", alpha = 0.8) +
+  paletteer::scale_fill_paletteer_d("ggthemes::Tableau_10",
+                                    labels=c("protect environment", " Economic growth", "Other")) +
+  ggtitle("Protecting environment vs Economic growth") +
+  labs(x = "survey period",
+       y = "% of respondents in survey") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+::: callout-note
+The opinion to protect the environment is increasing over the years.
+:::
+
+### How do people across different ages view this issue?
+
+1.- 16-24 years 2.- 25-34 years 3.- 35-44 years
+
+```{r}
+# Reshape data for easier analysis
+df <- wvs %>%
+  sel_mut(col = "4", new_col = "wave_4") %>% 
+  bind_rows(
+    sel_mut(wvs, col = "5", new_col = "wave_5")
+  ) %>%
+  bind_rows(
+    sel_mut(wvs, col = "6", new_col = "wave_6")
+  ) %>% 
+  bind_rows(
+    sel_mut(wvs, col = "7", new_col = "wave_7")
+  ) %>% 
+  rename(env_opinion = env_num) %>% 
+  mutate(across(everything(), factor))
+```
+
+Explore opinion vs age
+
+```{r}
+df %>% 
+  count(wave, env_opinion, age_num) %>% 
+  drop_na() %>%
+  group_by(age_num, wave) %>% 
+  mutate(total = sum(n), pct = n/total) %>%
+  ungroup() %>% 
+  mutate(age_num = case_when(
+    age_num == "1" ~ "16-24",
+    age_num == "2" ~ "25-34",
+    age_num == "3" ~ "35-44"
+  )) %>% 
+  ggplot(mapping = aes(x = age_num, y = pct*100)) +
+  geom_col(aes(fill = env_opinion), position = "dodge", alpha = 0.8) +
+  paletteer::scale_fill_paletteer_d("ggthemes::Tableau_10",
+                                    labels=c("protect environment", " Economic growth", "Other")) +
+  ggtitle("Protecting environment vs Economic growth") +
+  labs(x = "age",
+       y = "% of respondents in survey") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  facet_wrap(vars(wave), scales = "free_x")
+```
+
+::: callout-note
+Recent years (wave 7) has seen the highest proportion across all age groups advocating for protecting the environment.
+:::
+
+### Does income influence people's opinion?
+
+This section seeks to explore the variation of people's opinion with their income
+
+-   Low -- steps 1-3
+
+-   Middle -- steps 4-7
+
+-   High -- steps 8-10
+
+```{r}
+# library(ggforce)
+# df %>% 
+#   count(wave, env_opinion, age_num) %>% 
+#   drop_na() %>%
+#   ggplot(mapping = aes(x = wave, y = n)) +
+#   # Visualize distribution and number of samples
+#   ggforce::geom_sina(
+#     aes(color = env_opinion),
+#     position = position_dodge(width = .6),
+#     alpha = .5
+#   ) +
+#   stat_summary(
+#     aes(color = env_opinion),
+#     position = position_dodge(width = .6),
+#     size = .8
+#   ) 
+```
+
+```{r}
+# Regroup income leves
+df %>% 
+  drop_na() %>% 
+  mutate(income_num = as.numeric(income_num)) %>% 
+  mutate(income = case_when(
+    income_num < 4 ~ "low",
+    income_num > 7 ~ "high",
+    TRUE ~ "middle"
+  ),
+  
+  
+  # Account for changes in wave7 encoding
+  income = case_when(
+    wave == "wave_7" & income_num == 1 ~ "low", 
+    wave == "wave_7" & income_num == 2 ~ "middle",
+    wave == "wave_7" & income_num == 3 ~ "high",
+    TRUE ~ income
+  ),
+  
+  
+  income = factor(income, levels = c("high", "middle", "low"))) %>%
+  # Count people in a wave sharing same income level and opinion
+  count(wave, env_opinion, income) %>% 
+  # For people in a wave sharing the same income, what's their total
+  group_by(income, wave) %>% 
+  # Find how opinion varies among folks sharing the same income 
+  mutate(total = sum(n), pct = n/total) %>%
+  ungroup() %>% 
+  ggplot(mapping = aes(x = income, y = pct*100)) +
+  geom_col(aes(fill = env_opinion), position = "dodge", alpha = 0.8) +
+  paletteer::scale_fill_paletteer_d("ggthemes::Tableau_10",
+                                    labels=c("protect environment", " Economic growth", "Other")) +
+  ggtitle("Protecting environment vs Economic growth") +
+  labs(x = "income_levels",
+       y = "% of respondents in survey") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  facet_wrap(vars(wave), scales = "free_x")
+  
+```
+
+::: callout-note
+Why don't we have other incomes in wave_7 survey?
+
+In all waves, people at high income had the highest proportion agreeing to protect environment. Though very subtle, the proportion of people in support of economic growth in low income earners is higher than in middle and high earners.
+:::
+
+### Does education influence people's opinion?
+
+Education level (recoded): Lower: ISCED 0, ISCED 1, ISCED 2 Middle: ISCED 3, ISCED 4 Higher: ISCED 5, ISCED 6, ISCED 7, ISCED 8 1.- Lower 2.- Middle 3.- Higher
+
+```{r}
+# Regroup education levels
+df %>% 
+  mutate(education_num = as.numeric(education_num)) %>% 
+  mutate(education = case_when(
+    education_num < 3 ~ "lower",
+    education_num > 4 ~ "higher",
+    TRUE ~ "middle"
+  ),
+  
+  # Account for changes in wave7 encoding
+  education = case_when(
+    wave == "wave_7" & education_num == 2 ~ "middle", 
+    wave == "wave_7" & education_num == 3 ~ "higher",
+    TRUE ~ education
+  ),
+  
+  
+  education = factor(education, levels = c("higher", "middle", "lower"))) %>%
+  # Count people in a wave sharing same education level and opinion
+  count(wave, env_opinion, education) %>%
+  drop_na() %>% 
+  # For people in a wave sharing the same education, what's their total
+  group_by(education, wave) %>% 
+  # Find how opinion varies among folks sharing the same education level
+  mutate(total = sum(n), pct = n/total) %>%
+  ungroup() %>% 
+  ggplot(mapping = aes(x = education, y = pct*100)) +
+  geom_col(aes(fill = env_opinion), position = "dodge", alpha = 0.8) +
+  paletteer::scale_fill_paletteer_d("ggthemes::Tableau_10",
+                                    labels=c("protect environment", " Economic growth", "Other")) +
+  ggtitle("Protecting environment vs Economic growth") +
+  labs(x = "education_levels",
+       y = "% of respondents in survey") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  facet_wrap(vars(wave), scales = "free_x")
+```
+
+::: callout-note
+People with higher literacy levels are more for the opinion of environmental protection.
+:::
+
+```{r}
+View(ca_df)
+```
+
+## Do people living in areas with large usage of renewable energy have different opinions.
+
+## XGBOOST

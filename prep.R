@@ -11,7 +11,7 @@
 co2emissions = readxl::read_excel("data/CO2emissionsbycountry.xlsx",
                                   skip = 2)
 
-# GDP per capita data
+# GDP per capita data 
 gdp = readxl::read_excel("data/gdp/gdp.xls", skip = 2)
 
 # our world :)
@@ -97,10 +97,10 @@ tmap::tm_shape(climate_action_data) +
 # NOTE world values survey 
 
 # read waves 4-7
-wvs4 = foreign::read.spss("data/WV4_Data_spss_v20201117.sav", to.data.frame = TRUE)
-wvs5 = foreign::read.spss("data/WV5_Data_Spss_v20180912.sav", to.data.frame = TRUE)
-wvs6 = foreign::read.spss("data/WV6_Data_sav_v20201117.sav", to.data.frame = TRUE)
-wvs7 = foreign::read.spss("data/WVS_Cross-National_Wave_7_spss_v4_0.sav", to.data.frame = TRUE)
+wvs4 = foreign::read.spss("/Users/gretatimaite/Desktop/UNBigDataHackathon2022/data/WV4_Data_spss_v20201117.sav", to.data.frame = TRUE)
+wvs5 = foreign::read.spss("/Users/gretatimaite/Desktop/UNBigDataHackathon2022/data/WV5_Data_Spss_v20180912.sav", to.data.frame = TRUE)
+wvs6 = foreign::read.spss("/Users/gretatimaite/Desktop/UNBigDataHackathon2022/data/WV6_Data_sav_v20201117.sav", to.data.frame = TRUE)
+wvs7 = foreign::read.spss("/Users/gretatimaite/Desktop/UNBigDataHackathon2022/data/WVS_Cross-National_Wave_7_spss_v4_0.sav", to.data.frame = TRUE)
 
 # let's extract data from each wave:
 # country
@@ -174,13 +174,17 @@ wvs5_sub = wvs5_sub |>
                 education_5_num = education_5 |> as.numeric(),
                 income_5_num = income_5 |> as.numeric())
 
+# for some reason countries are returned as levels in integer form (e.g. 1) rather than character (i.e. "Andora"),
+# so we'll need to do tricks here :)
+unique_vals = wvs5_sub$country_5 |> unique() |> as.character()
 wvs5_new = data.frame(env_5_num = c(wvs5_sub$env_5_num, rep(NA, max_length - nrow(wvs5_sub))),
                       sex_5_num = c(wvs5_sub$sex_5_num, rep(NA, max_length - nrow(wvs5_sub))),
                       age_5_num = c(wvs5_sub$age_5_num, rep(NA, max_length - nrow(wvs5_sub))),
                       education_5_num = c(wvs5_sub$education_5_num, rep(NA, max_length - nrow(wvs5_sub))),
                       income_5_num = c(wvs5_sub$income_5_num, rep(NA, max_length - nrow(wvs5_sub))),
-                      country_5 = c(wvs5_sub$country_5, rep(NA, max_length - nrow(wvs5_sub)))
+                      country_5 = c(wvs5_sub$country_5, rep(NA, max_length - nrow(wvs5_sub))) |> factor(labels = unique_vals)
 )
+
 
 wvs4_sub = wvs4_sub |> 
   dplyr::mutate(env_4_num = env_4 |> as.numeric() |> as.factor(),
@@ -214,4 +218,19 @@ wvs = cbind(wvs4_new, wvs5_new, wvs6_new, wvs7_new)
 # let's save data
 # write.csv(wvs,
 #           "wvs.csv")
+
+# ===== OSM data ====
+
+# import csv file containing OSM data
+osm = readxl::read_excel("data/osm.xlsx")
+
+# let's extract year from the date
+osm_clean = osm |> 
+  dplyr::mutate(year = lubridate::year(timestamp)
+  ) |> 
+  dplyr::select(-1)
+
+# save our new osm dataset
+# write.csv(osm_clean,
+#           "osm_clean.csv")
 

@@ -40,3 +40,6 @@ landtemp
 library(tmap)
 world_land %>% tm_shape() + tm_polygons(col="X2017",style="quantile")
 world_land %>% tm_shape() + tm_polygons(col="X2010",breaks=c(0,170,4270,9932,33050,128706,10096010))
+# experiment with k-means clustering
+# what does scale() function do?
+try <- sort(world_land %>% pull("X2017"))[1:20]

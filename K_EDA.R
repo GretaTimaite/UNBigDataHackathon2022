@@ -1,4 +1,5 @@
 library(tmap)
+library(tidyverse)
 # read excel file
 CO2emis = readxl::read_excel("data/CO2emissionsbycountry.xlsx",
                               skip = 2)
@@ -32,3 +33,19 @@ library(sf)
 # load locally for now
 sfdf <- geojson_read("data/climate_action_data.geojson",what="sp") %>% st_as_sf()
 sfdf %>% tm_shape() + tm_polygons(col="ren_2018")
+
+# save sfdf as R object to be fed as data into the dashboard
+#saveRDS(sfdf,"data/sfdf.RData")
+
+# analysis to make Shiny plots of EDA per country
+#coln <- sfdf %>% st_drop_geometry() %>% filter(name_long=="Kenya") %>% select(starts_with("dis")) %>% 
+  colnames()
+coln <- sfdf %>% filter(name_long=="Kenya") st_drop_geometry() %>% select(-c(dis_Country,dis_ISO3,co2_Country.Name,gdpPercap)) %>%
+  select(starts_with(c("gdp"))) %>% names()
+coln1 <- as.numeric(substr(coln,nchar(coln)-4+1,nchar(coln)))
+values <- sfdf %>% st_drop_geometry() %>%filter(name_long=="Kenya") %>%  select(-c(dis_Country,dis_ISO3,co2_Country.Name,gdpPercap)) %>%
+  select(starts_with(c("gdp"))) %>% as.vector()
+plot(x=coln1,y=values)
+# library(stringr)
+# str_sub(coln, end=-4)
+#substr(A, nchar(A)-3+1, nchar(A))

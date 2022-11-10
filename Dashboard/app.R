@@ -7,29 +7,32 @@
 #    http://shiny.rstudio.com/
 #
 library(shinydashboard)
+library(geojsonio)
+library(sf)
 library(dashboardthemes)
 library(tmaptools)
 library(ggplot2)
 library(shiny)
 library(tidyverse)
 library(shinythemes)
-library(RColorBrewer)
-library(fields)
-library(ggsci)
+#library(RColorBrewer)
+#library(fields)
+#library(ggsci)
+library(tmap)
 # load data
-sfdf <- geojson_read("data/climate_action_data.geojson",what="sp") %>% st_as_sf()
+sfdf <- geojson_read("climate_action_data.geojson",what="sp") %>% st_as_sf()
 sfdf20 <- sfdf[c(sample(1:nrow(sfdf),20)),]
 # Define UI for application that draws a histogram
 ui <- dashboardPage(
-    dashboardHeader(title =tags$a("UNBigDataHackathon2022", href="https://github.com/Kika0/ResCompLeedsCon2022.RShiny",target="_blank"),
+    dashboardHeader(title =tags$a("UNBigDataHackathon2022", href="https://gretatimaite.github.io/campr/",target="_blank"),
                     titleWidth=250),
     dashboardSidebar(
       width=250,
       sidebarMenu(
         
         menuItem("EDA",tabName = "selectInput"),
-        menuItem("Linear regression models",tabName = "widgets_together"),
-        menuItem("Some map",tabName = "radioButtons_tmap"))
+        menuItem("EDA by country",tabName = "widgets_together"),
+        menuItem("World map",tabName = "radioButtons_tmap"))
     ),
     dashboardBody(
       shinyDashboardThemes(
@@ -40,25 +43,28 @@ ui <- dashboardPage(
                 #mod_selectInput_ui("selectInput_1")
                 ),
         tabItem(tabName = "widgets_together",
-              h1("Regression models for a sample of 20 countries"),
-              h3("World countries are randomly sampled each time app is run. Reload the page for another sample of countries."),
+              h1("Plotted values for selected country of selected variables"),
+              h3("Data is plotted for the 2000-2019 period (minus NA values that are country specific)"),
+              p("Legend: ren (% of renewable energy), temp (average yearly temperature),
+                gdp(Total Gross Domestic product), dis (number of disasters), co2 (total CO2 emissions)."),
                #mod_widgets_together_ui("widgets_together_1")
                fluidRow (
-               selectInput("res_var",
-                            "Select x-axis variable",
-                            choices=(colnames(sfdf %>% st_drop_geometry())),selected = "name_long"),
-                selectInput(inputId="lot_var",
+               selectInput("name",
+                            "Select Country",
+                            choices=(unique(sfdf %>% st_drop_geometry() %>% select(name_long))),selected = "Kenya"),
+                selectInput(inputId="var",
                             label = "Select y-axis variable",
-                            choices=(colnames(sfdf %>% st_drop_geometry())),selected = "ren_2014")
+                            choices=c("ren","co2","temp","dis","gdp"),selected = "ren")
         ,
         fluidRow(plotOutput(outputId = "regression_model")))
                 ),
         tabItem(tabName = "radioButtons_tmap",
-                h2("Map of origin and destination for the selected mode of transport"),
-                tags$p("The choropleth maps show counts of origins and destinations from each Hanoi commune."),
+                h2("World map of selected variable"),
+                tags$p("Legend: ren (% of renewable energy), temp (average yearly temperature),
+                gdp(Total Gross Domestic product), dis (number of disasters), co2 (total CO2 emissions)."),
                 
                 radioButtons(inputId="vars",label= NULL,inline=TRUE,
-                             choices = colnames(sfdf %>% as.data.frame())),
+                             choices = colnames(sfdf %>% as.data.frame() %>% select(starts_with(c("ren","co2","gdp","temp","dis"))))),
                 fluidRow(
                  h3("Choropleth map of variables"),tmapOutput(outputId = "map")),
                   
@@ -79,19 +85,31 @@ server <- function(input, output) {
     #modeldensity_leeds <- data.frame(sfdf %>% pull(!!sym(input$res_var)),sfdf %>% pull(!!sym(input$lot_var)))
     # fit regressions
     
-    sfdf20 %>% st_drop_geometry() %>% ggplot(aes(x=sfdf20 %>% pull(!!sym(input$res_var)),y=sfdf20 %>% pull(!!sym(input$lot_var)))) +
-      geom_smooth(method='lm') +
-      geom_point(alpha=0.5) +
-      xlab(input$res_var) +
-      ylab(input$lot_var) +
-      labs(title=paste0("Regression of ",input$res_var," and ",input$lot_var))
+    # sfdf20 %>% st_drop_geometry() %>% ggplot(aes(x=sfdf20 %>% pull(!!sym(input$res_var)),y=sfdf20 %>% pull(!!sym(input$lot_var)))) +
+    #   geom_smooth(method='lm') +
+    #   geom_point(alpha=0.5) +
+    #   xlab(input$res_var) +
+    #   ylab(input$lot_var) +
+    #   labs(title=paste0("Regression of ",input$res_var," and ",input$lot_var))
+    coln <- sfdf %>% filter(name_long==input$name) %>%  st_drop_geometry() %>% select(-c(dis_Country,dis_ISO3,co2_Country.Name,gdpPercap)) %>%
+      select(starts_with(c(input$var))) %>% names()
+    coln1 <- as.numeric(substr(coln,nchar(coln)-4+1,nchar(coln)))
+    values <- sfdf %>% st_drop_geometry() %>%filter(name_long==input$name) %>%  select(-c(dis_Country,dis_ISO3,co2_Country.Name,gdpPercap)) %>%
+      select(starts_with(c(input$var))) %>% unname() %>%  as_vector() 
+    plot(x=coln1,y=values)
+    # library(stringr)
+    df <- data.frame(coln1,values)
+    ggplot(df) + geom_line(aes(x=coln1,y=values))  + geom_point(aes(x=coln1,y=values),lwd=2) +
+      xlab(input$var) +
+      
+      theme_minimal() 
   })
   
   output$map <- renderTmap({
     tmap_options(basemaps = "OpenStreetMap")
   
     tm_shape(sfdf) +
-      tm_polygons(col= "ren_2018",palette=viridis(n=7),alpha = 0.5)
+      tm_polygons(col= input$vars,palette=viridis(n=7),alpha = 0.5)
   }) # end of renderTmap
 }
 

@@ -17,7 +17,7 @@ library(paletteer)
 
 # Load data
 wvs <- read_csv("wvs.csv")
-geo_df <- st_read("climate_action_data.geojson")
+ca_df <- st_read("climate_action_data.geojson")
 osm <- read_csv("result.csv")
 ```
 
@@ -171,6 +171,17 @@ df %>%
     income_num > 7 ~ "high",
     TRUE ~ "middle"
   ),
+  
+  
+  # Account for changes in wave7 encoding
+  income = case_when(
+    wave == "wave_7" & income_num == 1 ~ "low", 
+    wave == "wave_7" & income_num == 2 ~ "middle",
+    wave == "wave_7" & income_num == 3 ~ "high",
+    TRUE ~ income
+  ),
+  
+  
   income = factor(income, levels = c("high", "middle", "low"))) %>%
   # Count people in a wave sharing same income level and opinion
   count(wave, env_opinion, income) %>% 
@@ -204,16 +215,25 @@ Education level (recoded): Lower: ISCED 0, ISCED 1, ISCED 2 Middle: ISCED 3, ISC
 ```{r}
 # Regroup education levels
 df %>% 
-  drop_na() %>% 
   mutate(education_num = as.numeric(education_num)) %>% 
   mutate(education = case_when(
     education_num < 3 ~ "lower",
     education_num > 4 ~ "higher",
     TRUE ~ "middle"
   ),
+  
+  # Account for changes in wave7 encoding
+  education = case_when(
+    wave == "wave_7" & education_num == 2 ~ "middle", 
+    wave == "wave_7" & education_num == 3 ~ "higher",
+    TRUE ~ education
+  ),
+  
+  
   education = factor(education, levels = c("higher", "middle", "lower"))) %>%
   # Count people in a wave sharing same education level and opinion
-  count(wave, env_opinion, education) %>% 
+  count(wave, env_opinion, education) %>%
+  drop_na() %>% 
   # For people in a wave sharing the same education, what's their total
   group_by(education, wave) %>% 
   # Find how opinion varies among folks sharing the same education level
@@ -233,5 +253,11 @@ df %>%
 ::: callout-note
 People with higher literacy levels are more for the opinion of environmental protection.
 :::
+
+```{r}
+View(ca_df)
+```
+
+## Do people living in areas with large usage of renewable energy have different opinions.
 
 ## XGBOOST

@@ -16,6 +16,9 @@ library(shinythemes)
 library(RColorBrewer)
 library(fields)
 library(ggsci)
+library(sf)
+library(geojsonio)
+library(tmap)
 # load data
 sfdf <- geojson_read("data/climate_action_data.geojson",what="sp") %>% st_as_sf()
 sfdf20 <- sfdf[c(sample(1:nrow(sfdf),20)),]

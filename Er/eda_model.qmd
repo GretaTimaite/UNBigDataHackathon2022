@@ -542,6 +542,16 @@ xgb_model %>%
   autoplot()
 ```
 
+The performance metrics considered are:
+
+Recall: `TP/(TP + FN)` defined as the proportion of positive results out of the number of samples which were actually positive. Also known as `sensitivity`.
+
+Specificity: `TN/(TN + FP)` defined as the proportion of negative results out of the number of samples which were actually negative.
+
+Precision: `TP/(TP + FP)` defined as the proportion of predicted positives that are actually positive. Also called [positive predictive value](https://en.wikipedia.org/wiki/Positive_predictive_value "Positive predictive value")
+
+Accuracy: `TP + TN/(TP + TN + FP + FN)` The percentage of labels predicted accurately for a sample.
+
 ## Model interpretability
 
 ```{r}

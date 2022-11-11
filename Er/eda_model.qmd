@@ -514,10 +514,81 @@ xgb_race <- tune_grid(boost_wf, resamples = train_folds, grid = 7, metrics = eva
 ```{r}
 # Train model
 # Train then test
+
 xgb_model <- boost_wf %>% 
   last_fit(df_split, metrics = metric_set(accuracy, recall, spec, ppv, roc_auc, mn_log_loss, f_meas))
 
 # Collect metrics
 xgb_model %>% 
   collect_metrics()
+```
+
+```{r}
+# Plot confusion matrix
+xgb_model %>% 
+  collect_predictions() %>% 
+  conf_mat(truth = env_opinion, estimate = .pred_class) %>% 
+  autoplot(type = "heatmap")
+
+```
+
+```{r}
+# Prettier?
+update_geom_defaults(geom = "rect", new = list(fill = "midnightblue", alpha = 0.7))
+
+xgb_model %>% 
+  collect_predictions() %>% 
+  conf_mat(env_opinion, .pred_class) %>% 
+  autoplot()
+```
+
+## Model interpretability
+
+```{r}
+options(scipen = 999)
+# Extract trained workflow
+xgb_wf <- xgb_model %>% 
+  extract_workflow()
+
+# Extract variable importance
+library(vip)
+vi <- xgb_wf %>% 
+  extract_fit_parsnip() %>% 
+  vi()
+
+vi
+```
+
+Let's visualize these model interpretability results
+
+```{r}
+vi %>% 
+  slice_max(Importance, n = 42) %>%
+  mutate(Variable = fct_reorder(Variable, Importance)) %>%
+  ggplot(mapping = aes(y = Variable, x = Importance)) +
+  geom_point(size = 3, color = "dodgerblue") + 
+  geom_segment(aes(y = Variable, yend = Variable, x = 0, xend = Importance), size = 2, color = "dodgerblue", alpha = 0.7 ) +
+  ggtitle(paste("Variable Importance plot of top", round(nrow(vi)/2), "variables")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# SHAP for xgboost
+library(SHAPforxgboost)
+
+# Prepare shap values for plotting. Requires a matrix
+opinion_shap <- shap.prep(
+  # Actual Boost engine
+  xgb_model = xgb_wf %>% 
+    extract_fit_engine(),
+  # predictors used to calculate SHAP values
+  X_train = boost_recipe %>% 
+    prep() %>% bake(has_role("predictor"),
+                 new_data = NULL,
+                 composition = "matrix"),
+  top_n = 8
+  
+)
+
+shap.plot.summary(opinion_shap)
 ```

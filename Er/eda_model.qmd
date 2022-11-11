@@ -645,6 +645,8 @@ From the VIP plot, we can observe which variables most/least influence the model
 
 -   Higher education of literacy and certain age groups are important for the model.
 
+-   
+
 ```{r}
 # SHAP for xgboost
 library(SHAPforxgboost)
@@ -665,3 +667,9 @@ opinion_shap <- shap.prep(
 
 shap.plot.summary(opinion_shap)
 ```
+
+### Next steps
+
+-   Consider SHAP summary plot that combines **feature importance** and **feature effects** with features being ordered according to their importance.
+
+-   Explore Local model explanations which provide information about a prediction for a single observation and how changing a feature can simulate change in opinion.

@@ -15,21 +15,30 @@ library(ggplot2)
 library(shiny)
 library(tidyverse)
 library(shinythemes)
-<<<<<<< HEAD
+library(viridis)
 #library(RColorBrewer)
 #library(fields)
 #library(ggsci)
-=======
+
 library(RColorBrewer)
 library(fields)
 library(ggsci)
 library(sf)
 library(geojsonio)
->>>>>>> b5cb4708e260d1b8482a9818dbc9d509fe912985
 library(tmap)
 # load data
 sfdf <- geojson_read("climate_action_data.geojson",what="sp") %>% st_as_sf()
-sfdf20 <- sfdf[c(sample(1:nrow(sfdf),20)),]
+# read excel file for OSM data
+OSM = readxl::read_excel("osm.xlsx") 
+world = spData::world
+OSM$timestamp <- substr(OSM$timestamp,0,4)
+#%>% rename("count_ren"='0')
+# pivot_wider()
+OSM1 <- OSM %>% pivot_wider(names_from = timestamp)
+# join with world data 
+OSM_sf <- world %>% select(name_long) %>%  left_join(OSM1,by=c("name_long"="Country")) 
+
+#sfdf20 <- sfdf[c(sample(1:nrow(sfdf),20)),]
 # Define UI for application that draws a histogram
 ui <- dashboardPage(
     dashboardHeader(title =tags$a("UNBigDataHackathon2022", href="https://gretatimaite.github.io/campr/",target="_blank"),
@@ -38,9 +47,12 @@ ui <- dashboardPage(
       width=250,
       sidebarMenu(
         
-        menuItem("EDA",tabName = "selectInput"),
+        
         menuItem("EDA by country",tabName = "widgets_together"),
-        menuItem("World map",tabName = "radioButtons_tmap"))
+        menuItem("EDA world map",tabName = "radioButtons_tmap"),
+        menuItem("EDA WVS",tabName = "selectInput"),
+        menuItem("EDA world renewables",tabName = "OSM")
+    )
     ),
     dashboardBody(
       shinyDashboardThemes(
@@ -78,7 +90,20 @@ ui <- dashboardPage(
                   
             
                 #mod_radioButtons_tmap_ui("radioButtons_tmap_1")
-                )
+                ),
+        tabItem(tabName = "OSM",
+                h2("World map of count of renewable energy generators"),
+                tags$p("Count of generators per country per year."),
+                
+                radioButtons(inputId="year",label= NULL,inline=TRUE,
+                             choices = colnames(OSM_sf %>% as.data.frame() %>% select(-c(name_long,geom)))),
+                fluidRow(
+                  h3("Choropleth map for selected year"),
+                  tmapOutput(outputId = "mapOSM")),
+                
+                
+                #mod_radioButtons_tmap_ui("radioButtons_tmap_1")
+        )
       )))
 # Define server logic required to draw a histogram
 server <- function(input, output) {
@@ -119,6 +144,15 @@ server <- function(input, output) {
     tm_shape(sfdf) +
       tm_polygons(col= input$vars,palette=viridis(n=7),alpha = 0.5)
   }) # end of renderTmap
+  
+  output$mapOSM <- renderTmap({
+    tmap_options(basemaps = "OpenStreetMap")
+    
+    tm_shape(OSM_sf) +
+      tm_polygons(col= input$year,palette=viridis(n=7),alpha = 0.5)
+  }) # end of renderTmap
+  # make tmap
+    
 }
 
 # Run the application 

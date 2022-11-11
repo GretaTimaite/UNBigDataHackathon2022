@@ -641,7 +641,9 @@ From the VIP plot, we can observe which variables most/least influence the model
 
 -   The proportion of renewable energy consumed by respondents was the second most predictive feature. Perhaps if people experience the viability of renewable energy sources and the positive effects on their cities etc, they are more likely to support climate action.
 
--   The gdp of a coun
+-   Other factors directly related to climate change are also considered important by the model in predicting opinion. As people observe effects of climate change, this would influence their thoughts.
+
+-   Higher education of literacy and certain age groups are important for the model.
 
 ```{r}
 # SHAP for xgboost

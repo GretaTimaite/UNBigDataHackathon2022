@@ -1,5 +1,7 @@
 library(tmap)
 library(tidyverse)
+library(geojsonio)
+library(sf)
 # read excel file
 CO2emis = readxl::read_excel("data/CO2emissionsbycountry.xlsx",
                               skip = 2)
@@ -27,8 +29,6 @@ wws <- read.csv("data/wvs.csv")
 
 # load geojson file
 # Let's read the jeoJson file that is stored on the web with the geojsonio library:
-library(geojsonio)
-library(sf)
 # spdf <- geojson_read("https://raw.githubusercontent.com/GretaTimaite/UNBigDataHackathon2022/main/climate_action_data.geojson",  what = "sp")
 # load locally for now
 sfdf <- geojson_read("data/climate_action_data.geojson",what="sp") %>% st_as_sf()
@@ -53,3 +53,18 @@ ggplot(df) + geom_line(aes(x=coln1,y=values))  + geom_point(aes(x=coln1,y=values
 
 # str_sub(coln, end=-4)
 #substr(A, nchar(A)-3+1, nchar(A))
+
+# make tmap from OSM data
+# read excel file for OSM data
+OSM = readxl::read_excel("data/OSM.xlsx"
+                             ) 
+OSM$timestamp <- substr(OSM$timestamp,0,4)
+    #%>% rename("count_ren"='0')
+# pivot_wider()
+OSM1 <- OSM %>% pivot_wider(names_from = timestamp)
+# join with world data 
+OSM_sf <- world %>% select(name_long) %>%  left_join(OSM1,by=c("name_long"="Country")) 
+# make tmap
+tm_shape(OSM_sf) +
+  tm_polygons(col= "2022",palette=viridis(n=7),alpha = 0.5)
+

@@ -87,6 +87,15 @@ The opinion to protect the environment is increasing over the years.
 1.- 16-24 years 2.- 25-34 years 3.- 35-44 years
 
 ```{r}
+# Define cleaning function
+sel_mut <- function(df, col, new_col){
+  df %>% 
+    select(contains(col)) %>% 
+    mutate(wave = new_col) %>% 
+    rename_with(~str_replace(.x, "[:digit:]", "") %>% str_remove("_"))
+}
+
+
 # Reshape data for easier analysis
 df <- wvs %>%
   sel_mut(col = "4", new_col = "wave_4") %>% 
@@ -254,10 +263,248 @@ df %>%
 People with higher literacy levels are more for the opinion of environmental protection.
 :::
 
-```{r}
-View(ca_df)
-```
+## Cleaning data for modeling
 
 ## Do people living in areas with large usage of renewable energy have different opinions.
 
+```{r}
+library(janitor)
+# Download open country code data
+country_codes <- read_csv("https://gist.githubusercontent.com/tadast/8827699/raw/f5cac3d42d16b78348610fc4ec301e9234f82821/countries_codes_and_coordinates.csv", show_col_types = FALSE) %>% 
+  clean_names() %>% 
+  select(country, country_code = alpha_3_code, iso_a2 = alpha_2_code)
+
+# Left join this to data
+df <- df %>% 
+  rename(country_code = country) %>% 
+  left_join(country_codes %>% select(-iso_a2), by = "country_code") %>% 
+  # Account for NA values due to dataset mismatches
+  mutate(
+    country = replace_na(country, "unknown"),
+    country = case_when(
+    country == "unknown" ~ country_code,
+    TRUE ~ country
+  )) %>%
+  # Add iso_a2 column due to climate action data
+  left_join(country_codes %>% select(-country_code), by = "country")
+```
+
+### Join data with climate action data
+
+```{r}
+df %>% 
+  left_join(ca_df %>% 
+  select(iso_a2, contains("ren")) %>% 
+  st_drop_geometry() %>% 
+  as_tibble() %>% 
+  pivot_longer(!iso_a2, names_to = "ren", values_to = "ren_val") %>% 
+  group_by(iso_a2) %>% 
+  summarise(mean_ren = mean(ren_val), diff_ren = sum(diff(ren_val))),
+  by = "iso_a2") %>% 
+  #mutate(mean_ren = mean(across(starts_with("ren")))) %>% 
+  ggplot()
+```
+
+```{r}
+ca_df %>% 
+  select(iso_a2, contains("ren")) %>% 
+  st_drop_geometry() %>% 
+  as_tibble() %>% 
+  pivot_longer(!iso_a2, names_to = "ren", values_to = "ren_val") %>% 
+  group_by(iso_a2) %>% 
+  summarise(mean_ren = mean(ren_val), diff_ren = sum(diff(ren_val))) %>% View()
+```
+
+```{r}
+feature_summarize = function(tbl, feature){
+  tbl %>% 
+    select(iso_a2, contains(feature)) %>% 
+    pivot_longer(!iso_a2, names_to = "feature", values_to = "val") %>%
+    group_by(iso_a2) %>% 
+    mutate(val = replace_na(val, mean(val, na.rm = TRUE))) %>% 
+    group_by(iso_a2) %>% 
+    summarise(val = sum(diff(val))) %>% 
+    select(iso_a2, {{feature}} := val)
+    
+}
+```
+
+```{r}
+ca_df %>% filter(iso_a2 == "KE") %>% select(contains("temp")) %>% st_drop_geometry() %>% slice(n = 1) %>% as.vector() %>% as.numeric()->xxc
+
+sum(diff(xxc))
+```
+
+```{r}
+ca_df %>% 
+  st_drop_geometry() %>% 
+  feature_summarize(feature = "gdp_2") %>% View()
+```
+
 ## XGBOOST
+
+Create features
+
+```{r}
+ca_dft <- ca_df %>% 
+  st_drop_geometry() %>% 
+  as_tibble()
+
+model_df <- df %>%
+  # Modify education
+  mutate(education_num = as.numeric(education_num)) %>% 
+  mutate(education = case_when(
+    education_num < 3 ~ "lower",
+    education_num > 4 ~ "higher",
+    TRUE ~ "middle"
+  ),
+  
+  # Account for changes in wave7 encoding
+  education = case_when(
+    wave == "wave_7" & education_num == 2 ~ "middle", 
+    wave == "wave_7" & education_num == 3 ~ "higher",
+    TRUE ~ education
+  ),
+  
+  
+  education = factor(education, levels = c("higher", "middle", "lower"))) %>%
+  
+  # Modify income
+  drop_na() %>% 
+  mutate(income_num = as.numeric(income_num)) %>% 
+  mutate(income = case_when(
+    income_num < 4 ~ "low",
+    income_num > 7 ~ "high",
+    TRUE ~ "middle"
+  ),
+  
+  
+  # Account for changes in wave7 encoding
+  income = case_when(
+    wave == "wave_7" & income_num == 1 ~ "low", 
+    wave == "wave_7" & income_num == 2 ~ "middle",
+    wave == "wave_7" & income_num == 3 ~ "high",
+    TRUE ~ income
+  ),
+  
+  
+  income = factor(income, levels = c("high", "middle", "low"))) %>%
+  
+  # Modify age
+  mutate(age_num = case_when(
+    age_num == "1" ~ "16-29",
+    age_num == "2" ~ "30-39",
+    age_num == "3" ~ "50 and above"
+  )) %>%
+  
+  left_join(feature_summarize(ca_dft, "ren")) %>% 
+  left_join(feature_summarize(ca_dft, "dis_F")) %>%  
+  left_join(feature_summarize(ca_dft, "temp")) %>% 
+  left_join(feature_summarize(ca_dft, "co2_2")) %>%  
+  left_join(feature_summarize(ca_dft, "gdp_2")) %>% 
+  left_join(ca_dft %>% select(iso_a2, lifeExp), by = "iso_a2") %>% 
+  drop_na() %>% 
+  filter(env_opinion != "3")
+```
+
+### Fit xg_boost model
+
+```{r}
+# Load tidymodels and xgboost
+library(tidymodels)
+library(xgboost)
+
+set.seed(2056)
+
+
+# Split data
+df_split <- model_df %>% 
+  initial_split(prop = 0.75)
+
+# Extract train and test sets
+train = training(df_split)
+test = testing(df_split)
+
+glue::glue(
+  'The training set has {nrow(train)} observations \n',
+  'The testing set has {nrow(test)} observations'
+)
+
+# Create resamples for model assessment
+train_folds = vfold_cv(train, v = 3)
+```
+
+#### Create preprocessor
+
+```{r}
+# Function for prepping and baking a recipe
+prep_juice <- function(recipe){
+  recipe %>% 
+    prep() %>% 
+    juice()
+}
+
+boost_recipe <- recipe(
+  env_opinion ~ age_num + education + income + 
+    ren + dis_F + temp +co2_2 +gdp_2+ lifeExp, data = train) %>% 
+  # Pool infrequently occurring values into an "other" category.
+  step_other(age_num, threshold = 0.05) %>%
+  step_other(contains("age_num"), threshold = 0.05) %>% 
+  # Encode dummy variables
+  step_dummy(all_nominal_predictors(), one_hot = TRUE) %>% 
+  # Near zero variance filter
+  step_nzv(all_predictors()) 
+
+
+# Just for sanity check
+#View(prep_juice(boost_recipe))
+
+# Create boosted tree model specification
+boost_spec <- boost_tree(
+  #mtry = tune(),
+  trees = tune(),
+  #min_n = tune(),
+  #tree_depth = tune(),
+  learn_rate = 0.01,
+  #loss_reduction = tune(),
+  #sample_size = tune(),
+  #stop_iter = tune()
+  ) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("classification")
+
+# Bind recipe and model specification together
+boost_wf <- workflow() %>% 
+  add_recipe(boost_recipe) %>% 
+  add_model(boost_spec)
+
+# Print workflow
+boost_wf
+```
+
+### Model training
+
+```{r}
+doParallel::registerDoParallel()
+set.seed(2056)
+#library(finetune)
+
+# Evaluation metrics during tuning
+eval_metrics <- metric_set(mn_log_loss, accuracy)
+xgb_race <- tune_grid(boost_wf, resamples = train_folds, grid = 7, metrics = eval_metrics)
+
+# # Efficient grid search via racing
+# xgb_race <- tune_race_anova(
+#   object = boost_wf,
+#   resamples = train_folds,
+#   metrics = eval_metrics,
+#   
+#   # Try out 20 different hyperparameter combinations
+#   grid = 20,
+#   control = control_race(
+#     verbose_elim = TRUE
+#   )
+# )
+
+
+```

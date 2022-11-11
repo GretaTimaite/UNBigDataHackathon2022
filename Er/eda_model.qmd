@@ -121,10 +121,11 @@ df %>%
   group_by(age_num, wave) %>% 
   mutate(total = sum(n), pct = n/total) %>%
   ungroup() %>% 
+  # Modify age
   mutate(age_num = case_when(
-    age_num == "1" ~ "16-24",
-    age_num == "2" ~ "25-34",
-    age_num == "3" ~ "35-44"
+    age_num == "1" ~ "16-29",
+    age_num == "2" ~ "30-39",
+    age_num == "3" ~ "50 and above"
   )) %>% 
   ggplot(mapping = aes(x = age_num, y = pct*100)) +
   geom_col(aes(fill = env_opinion), position = "dodge", alpha = 0.8) +
@@ -419,6 +420,7 @@ set.seed(2056)
 
 # Split data
 df_split <- model_df %>% 
+  mutate(env_opinion = factor(env_opinion, levels = c("1", "2"))) %>% 
   initial_split(prop = 0.75)
 
 # Extract train and test sets
@@ -462,7 +464,7 @@ boost_recipe <- recipe(
 # Create boosted tree model specification
 boost_spec <- boost_tree(
   #mtry = tune(),
-  trees = tune(),
+  trees = 50,
   #min_n = tune(),
   #tree_depth = tune(),
   learn_rate = 0.01,
@@ -507,4 +509,15 @@ xgb_race <- tune_grid(boost_wf, resamples = train_folds, grid = 7, metrics = eva
 # )
 
 
+```
+
+```{r}
+# Train model
+# Train then test
+xgb_model <- boost_wf %>% 
+  last_fit(df_split, metrics = metric_set(accuracy, recall, spec, ppv, roc_auc, mn_log_loss, f_meas))
+
+# Collect metrics
+xgb_model %>% 
+  collect_metrics()
 ```

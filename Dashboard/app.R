@@ -91,7 +91,7 @@ ui <- dashboardPage(
         tabItem(tabName = "radioButtons_tmap",
                 h2("World map of selected variable"),
                 tags$p("Legend: ren (% of renewable energy), temp (average yearly temperature),
-                gdp(Total Gross Domestic product), dis (number of disasters), co2 (total CO2 emissions)."),
+                gdp(Gross Domestic Product per person), dis (number of disasters), co2 (total CO2 emissions)."),
                 
                 radioButtons(inputId="vars",label= NULL,inline=TRUE,
                              choices = colnames(sfdf %>% as.data.frame() %>% select(starts_with(c("ren","co2","gdp","temp","dis"))))),

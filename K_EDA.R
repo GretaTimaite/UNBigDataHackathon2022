@@ -5,6 +5,16 @@ library(sf)
 # read excel file
 CO2emis = readxl::read_excel("data/CO2emissionsbycountry.xlsx",
                               skip = 2)
+# load country shapefile
+# NOTE: uses iso_a2 (2-letter country code)
+world = spData::world
+# load World View Survey data
+wvs <- read.csv("data/wvs.csv")
+# NOTE: world view sirvey uses 3-letter country codes
+# load locally for now
+sfdf <- geojson_read("data/climate_action_data.geojson",what="sp") %>% st_as_sf()
+# read excel file for OSM data
+OSM = readxl::read_excel("data/OSM.xlsx")
 
 # check if read correctly
 # NOTE: uses 3-letter country code
@@ -20,18 +30,7 @@ names(CO2emis[,colSums(is.na(CO2emis))==266])
 names(CO2emis[,colSums(is.na(CO2emis))!=266 & colSums(is.na(CO2emis)) > 30])
 # suggests 1992-2019 is best choice
 
-# load country shapefile
-# NOTE: uses iso_a2 (2-letter country code)
-world = spData::world
-
-wws <- read.csv("data/wvs.csv")
-# NOTE: world view sirvey uses 3-letter country codes
-
-# load geojson file
-# Let's read the jeoJson file that is stored on the web with the geojsonio library:
-# spdf <- geojson_read("https://raw.githubusercontent.com/GretaTimaite/UNBigDataHackathon2022/main/climate_action_data.geojson",  what = "sp")
-# load locally for now
-sfdf <- geojson_read("data/climate_action_data.geojson",what="sp") %>% st_as_sf()
+# map renewable energy % per country in 2018
 sfdf %>% tm_shape() + tm_polygons(col="ren_2018")
 
 # save sfdf as R object to be fed as data into the dashboard
@@ -55,9 +54,6 @@ ggplot(df) + geom_line(aes(x=coln1,y=values))  + geom_point(aes(x=coln1,y=values
 #substr(A, nchar(A)-3+1, nchar(A))
 
 # make tmap from OSM data
-# read excel file for OSM data
-OSM = readxl::read_excel("data/OSM.xlsx"
-                             ) 
 OSM$timestamp <- substr(OSM$timestamp,0,4)
     #%>% rename("count_ren"='0')
 # pivot_wider()

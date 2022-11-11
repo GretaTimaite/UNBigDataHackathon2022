@@ -597,7 +597,15 @@ Overall, for only tuning the number of trees, the model performed quite decently
 
 ## Model interpretability
 
-In this section, we explore why the model makes the predictions it does.
+In this section, we explore why the model makes the predictions it does starting with variable importance plots.
+
+### Variable importance plots
+
+Variable Importance plots are one way of understanding which predictor has the largest effect on the model outcomes.
+
+The main idea is to measure how much does a model\'s performance changes if the effect of a selected explanatory variable, or of a group of variables, is removed.
+
+
 
 ```{r}
 options(scipen = 999)
@@ -626,6 +634,14 @@ vi %>%
   ggtitle(paste("Variable Importance plot of top", round(nrow(vi)/2), "variables")) +
   theme(plot.title = element_text(hjust = 0.5))
 ```
+
+From the VIP plot, we can observe which variables most/least influence the model performance.
+
+-   The `life expectancy` of the country where an individual lives in has the most predictive value for this model. This alludes to if the living conditions that lead to higher life expectancies such as health, diet/nutrition, respondents are more likely to support climate action.
+
+-   The proportion of renewable energy consumed by respondents was the second most predictive feature. Perhaps if people experience the viability of renewable energy sources and the positive effects on their cities etc, they are more likely to support climate action.
+
+-   The gdp of a coun
 
 ```{r}
 # SHAP for xgboost

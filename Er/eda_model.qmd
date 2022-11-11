@@ -344,7 +344,11 @@ ca_df %>%
 
 ## XGBOOST
 
-Create features
+There are several steps to create a useful model, including parameter estimation, model selection and tuning, and performance assessment.
+
+First, is selecting the most appropriate variables for prediction.
+
+In this section, we select the most appropriate variables based on previous EDA,
 
 ```{r}
 ca_dft <- ca_df %>% 
@@ -410,6 +414,10 @@ model_df <- df %>%
 
 ### Fit xg_boost model
 
+For the first part, data is split into two distinct sets, the training set and the test set. The training set (typically larger) is used to develop and optimize the model by fitting different models and investigating various feature engineering strategies etc.
+
+The other portion of the data is the *test set*. This is held in reserve until one or two models are chosen as the methods that are most likely to succeed.
+
 ```{r}
 # Load tidymodels and xgboost
 library(tidymodels)
@@ -437,6 +445,8 @@ train_folds = vfold_cv(train, v = 3)
 ```
 
 #### Create preprocessor
+
+Feature engineering entails reformatting predictor values to make them easier for a model to use effectively.
 
 ```{r}
 # Function for prepping and baking a recipe
@@ -486,6 +496,8 @@ boost_wf
 
 ### Model training
 
+Boosted tree models typically have *tuning parameters* or *hyperparameters* must be specified ahead of time and can\'t be directly found from training data. These are unknown structural or other kind of values that have significant impact on the model but cannot be directly estimated from the data. Instead, hyperparameters are estimated using simulated data sets created from a process called resampling such as cross-validation or bootstrap resampling.
+
 ```{r}
 doParallel::registerDoParallel()
 set.seed(2056)
@@ -493,35 +505,48 @@ set.seed(2056)
 
 # Evaluation metrics during tuning
 eval_metrics <- metric_set(mn_log_loss, accuracy)
-xgb_race <- tune_grid(boost_wf, resamples = train_folds, grid = 7, metrics = eval_metrics)
+# xgb_race <- tune_grid(boost_wf, resamples = train_folds, grid = 7, metrics = eval_metrics)
 
 # # Efficient grid search via racing
-# xgb_race <- tune_race_anova(
-#   object = boost_wf,
-#   resamples = train_folds,
-#   metrics = eval_metrics,
-#   
-#   # Try out 20 different hyperparameter combinations
-#   grid = 20,
-#   control = control_race(
-#     verbose_elim = TRUE
-#   )
-# )
+xgb_race <- tune_race_anova(
+  object = boost_wf,
+  resamples = train_folds,
+  metrics = eval_metrics,
+
+  # Try out 20 different hyperparameter combinations
+  grid = 20,
+  control = control_race(
+    verbose_elim = TRUE
+  )
+)
 
 
 ```
 
 ```{r}
+# Tibble with model with best accuracy
+xgb_race %>% 
+  show_best(metric = "accuracy")
+```
+
+```{r}
 # Train model
 # Train then test
+# Finalize workflow
+final_boost_wf <- boost_wf %>% 
+  finalize_workflow(select_best(xgb_race, metric = "mn_log_loss" #mn_log_loss
+                    ))
 
-xgb_model <- boost_wf %>% 
+# Train then test
+xgb_model <- final_boost_wf %>% 
   last_fit(df_split, metrics = metric_set(accuracy, recall, spec, ppv, roc_auc, mn_log_loss, f_meas))
 
 # Collect metrics
 xgb_model %>% 
   collect_metrics()
 ```
+
+### Evaluate model performance
 
 ```{r}
 # Plot confusion matrix
@@ -542,7 +567,7 @@ xgb_model %>%
   autoplot()
 ```
 
-The performance metrics considered are:
+The performance metrics considered are:=
 
 Recall: `TP/(TP + FN)` defined as the proportion of positive results out of the number of samples which were actually positive. Also known as `sensitivity`.
 
@@ -552,7 +577,27 @@ Precision: `TP/(TP + FP)` defined as the proportion of predicted positives that 
 
 Accuracy: `TP + TN/(TP + TN + FP + FN)` The percentage of labels predicted accurately for a sample.
 
+```{r}
+
+# Collect metrics
+xgb_model %>% 
+  collect_metrics() %>% 
+  filter(.metric %in% c("accuracy", "recall", "f_meas", "mn_log_loss"))
+```
+
+Insights from modeling results:
+
+-   The model was able to correctly distinguish 60% of the respondents
+
+-   The model has a high ability to accurately distinguish respondents who support climate action.
+
+-   F Measure: A weighted average of the precision and recall, with best being 1 and worst being 0.
+
+Overall, for only tuning the number of trees, the model performed quite decently.
+
 ## Model interpretability
+
+In this section, we explore why the model makes the predictions it does.
 
 ```{r}
 options(scipen = 999)

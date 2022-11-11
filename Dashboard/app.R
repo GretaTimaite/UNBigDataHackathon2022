@@ -15,21 +15,32 @@ library(ggplot2)
 library(shiny)
 library(tidyverse)
 library(shinythemes)
-<<<<<<< HEAD
+library(viridis)
 #library(RColorBrewer)
 #library(fields)
 #library(ggsci)
-=======
+library(paletteer)
 library(RColorBrewer)
 library(fields)
 library(ggsci)
 library(sf)
 library(geojsonio)
->>>>>>> b5cb4708e260d1b8482a9818dbc9d509fe912985
 library(tmap)
 # load data
 sfdf <- geojson_read("climate_action_data.geojson",what="sp") %>% st_as_sf()
-sfdf20 <- sfdf[c(sample(1:nrow(sfdf),20)),]
+# read excel file for OSM data
+OSM = readxl::read_excel("osm.xlsx") 
+world = spData::world
+OSM$timestamp <- substr(OSM$timestamp,0,4)
+#%>% rename("count_ren"='0')
+# pivot_wider()
+OSM1 <- OSM %>% pivot_wider(names_from = timestamp)
+# join with world data 
+OSM_sf <- world %>% select(name_long) %>%  left_join(OSM1,by=c("name_long"="Country")) 
+# load data for WVS
+wvs <- read_csv("wvs.csv")
+wv <- wvs %>% select(country_5) %>% left_join((sfdf %>% st_drop_geometry() %>% select(name_long,dis_ISO3)),by=(c("country_5"="name_long")))
+#sfdf20 <- sfdf[c(sample(1:nrow(sfdf),20)),]
 # Define UI for application that draws a histogram
 ui <- dashboardPage(
     dashboardHeader(title =tags$a("UNBigDataHackathon2022", href="https://gretatimaite.github.io/campr/",target="_blank"),
@@ -38,16 +49,27 @@ ui <- dashboardPage(
       width=250,
       sidebarMenu(
         
-        menuItem("EDA",tabName = "selectInput"),
+        
         menuItem("EDA by country",tabName = "widgets_together"),
-        menuItem("World map",tabName = "radioButtons_tmap"))
+        menuItem("EDA world map",tabName = "radioButtons_tmap"),
+        menuItem("EDA WVS",tabName = "selectInput"),
+        menuItem("EDA world renewables",tabName = "OSM")
+    )
     ),
     dashboardBody(
       shinyDashboardThemes(
         theme = "blue_gradient"),
       tabItems(
         tabItem(tabName = "selectInput",
-                
+                h1("World View Survey (WVS) data plotted per country"),
+                h3("Is environmental protection more important than economic growth?"),
+                fluidRow (
+                  selectInput("name1",
+                              "Select Country",
+                              choices=(unique(wvs %>% select(country_4))),selected = "ARG"),
+                  
+                  
+                  fluidRow(plotOutput(outputId = "wvs")))
                 #mod_selectInput_ui("selectInput_1")
                 ),
         tabItem(tabName = "widgets_together",
@@ -69,7 +91,7 @@ ui <- dashboardPage(
         tabItem(tabName = "radioButtons_tmap",
                 h2("World map of selected variable"),
                 tags$p("Legend: ren (% of renewable energy), temp (average yearly temperature),
-                gdp(Total Gross Domestic product), dis (number of disasters), co2 (total CO2 emissions)."),
+                gdp(Gross Domestic Product per person), dis (number of disasters), co2 (total CO2 emissions)."),
                 
                 radioButtons(inputId="vars",label= NULL,inline=TRUE,
                              choices = colnames(sfdf %>% as.data.frame() %>% select(starts_with(c("ren","co2","gdp","temp","dis"))))),
@@ -78,7 +100,20 @@ ui <- dashboardPage(
                   
             
                 #mod_radioButtons_tmap_ui("radioButtons_tmap_1")
-                )
+                ),
+        tabItem(tabName = "OSM",
+                h2("World map of count of renewable energy generators"),
+                tags$p("Count of generators per country per year."),
+                
+                radioButtons(inputId="year",label= NULL,inline=TRUE,
+                             choices = colnames(OSM_sf %>% as.data.frame() %>% select(-c(name_long,geom)))),
+                fluidRow(
+                  h3("Choropleth map for selected year"),
+                  tmapOutput(outputId = "mapOSM")),
+                
+                
+                #mod_radioButtons_tmap_ui("radioButtons_tmap_1")
+        )
       )))
 # Define server logic required to draw a histogram
 server <- function(input, output) {
@@ -119,6 +154,56 @@ server <- function(input, output) {
     tm_shape(sfdf) +
       tm_polygons(col= input$vars,palette=viridis(n=7),alpha = 0.5)
   }) # end of renderTmap
+  
+  output$mapOSM <- renderTmap({
+    tmap_options(basemaps = "OpenStreetMap")
+    
+    tm_shape(OSM_sf) +
+      tm_polygons(col= input$year,palette=viridis(n=7),alpha = 0.5)
+  }) # end of renderTmap
+  # make tmap
+  
+  output$wvs <- renderPlot({
+    theme_set(theme_light())
+    # Explore how responses have changed over time
+    env_count <- wvs %>% 
+      # Select evn columns
+      mutate("country_5"=as_vector( wv[,2])) %>% 
+      filter(country_5==input$name1 |country_4==input$name1 |country_6==input$name1 |country_7==input$name1  ) %>% 
+      select(contains("env")) %>% 
+      #filter(if_any(everything(), is.na)) %>%  
+      # Reshape data for easy analysis
+      pivot_longer(everything(), names_to = "env", values_to = "opinion") %>% 
+      #mutate(across(everything()))
+      # Drop missing values
+      drop_na() %>% 
+      mutate(opinion = factor(opinion)) %>% 
+      # Count number of respondents in each category
+      count(env, opinion) %>% 
+      group_by(env) %>% 
+      mutate(total = sum(n)) %>% 
+      ungroup() %>% 
+      mutate(pct = n/total) %>% 
+      # Rename rows
+      mutate(env = case_when(
+        env == "env_4_num" ~ "wave_4",
+        env == "env_5_num" ~ "wave_5",
+        env == "env_6_num" ~ "wave_6",
+        env == "env_7_num" ~ "wave_7"
+      ))
+    
+    # Visualize this
+    env_count %>% 
+      ggplot(mapping = aes(x = env, y = pct*100)) +
+      geom_col(aes(fill = opinion), position = "dodge", alpha = 0.8) +
+      paletteer::scale_fill_paletteer_d("ggthemes::Tableau_10",
+                                        labels=c("protect environment", " Economic growth", "Other")) +
+      ggtitle("Protecting environment vs Economic growth") +
+      labs(x = "survey period",
+           y = "% of respondents in survey") +
+      theme(plot.title = element_text(hjust = 0.5))
+  })
+    
 }
 
 # Run the application 
